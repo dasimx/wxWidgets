@@ -592,7 +592,13 @@ wxDisplayFactoryMSW::GetDpiForMonitorPtr()
 
 void wxDisplayFactoryMSW::DoRefreshMonitors()
 {
-    m_displays.clear();
+    // In some cases, EnumDisplayMonitors() can fail to enumerate any monitors.
+    // (apparently this happens if we receive WM_SETTINGCHANGE while a UAC
+    // prompt is shown, for example). Keep our original display information in
+    // this case as it's better to keep using it rather than not having any
+    // monitor data at all.
+    wxVector<wxDisplayInfo> displaysOrig;
+    m_displays.swap(displaysOrig);
 
     // We need to pass a valid HDC here in order to get valid hdcMonitor in our
     // callback.
@@ -600,6 +606,12 @@ void wxDisplayFactoryMSW::DoRefreshMonitors()
     if ( !::EnumDisplayMonitors(dc, NULL, MultimonEnumProc, (LPARAM)this) )
     {
         wxLogLastError(wxT("EnumDisplayMonitors"));
+    }
+
+    if ( m_displays.empty() )
+    {
+        // Continue using old data, it seems like the least evil in this case.
+        m_displays.swap(displaysOrig);
     }
 }
 
